@@ -77,9 +77,9 @@ def generate_ics(days: Sequence[dict], filename: Text) -> None:
         start = _cast_date(fr["date"])
         end = _cast_date(to["date"]) + datetime.timedelta(days=1)
 
-        name = fr["name"] + "假期"
-        if not fr["isOffDay"]:
-            name = "上班(补" + name + ")"
+        name = fr["name"]
+        if fr["isOffDay"]:
+            name += "假期"
         cal.add_component(_create_event(name, start, end))
 
     with open(filename, "wb") as f:

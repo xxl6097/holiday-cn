@@ -34,8 +34,9 @@ class ChinaTimezone(tzinfo):
 def update_data(year: int) -> Iterator[str]:
     """Update and store data for a year."""
 
-    json_filename = workspace_path(f"{year}.json")
-    ics_filename = workspace_path(f"{year}.ics")
+    json_filename = workspace_path("json", f"{year}.json")
+    ics_filename = workspace_path("json", f"{year}.ics")
+    os.makedirs(os.path.dirname(json_filename), exist_ok=True)
     with open(json_filename, "w", encoding="utf-8", newline="\n") as f:
         data = fetch_holiday(year)
 
@@ -48,7 +49,7 @@ def update_data(year: int) -> Iterator[str]:
                     ),
                     (
                         "$id",
-                        f"https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json",
+                        f"https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/json/{year}.json",
                     ),
                     *data.items(),
                 )
@@ -67,14 +68,14 @@ def update_data(year: int) -> Iterator[str]:
 def update_main_ics(fr_year, to_year):
     all_days = []
     for year in range(fr_year, to_year + 1):
-        filename = workspace_path(f"{year}.json")
+        filename = workspace_path("json", f"{year}.json")
         if not os.path.isfile(filename):
             continue
         with open(filename, "r", encoding="utf8") as inf:
             data = json.loads(inf.read())
             all_days.extend(data.get("days"))
 
-    filename = workspace_path("holiday-cn.ics")
+    filename = workspace_path("json", "holiday-cn.ics")
     generate_ics(
         all_days,
         filename,
@@ -87,7 +88,8 @@ def main():
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Update all years since 2007, default is this year and next year",
+        help="Update all years since 2007, default is recent 6 years "
+        "(this year - 4 to next year)",
     )
     parser.add_argument(
         "--release",
@@ -99,13 +101,15 @@ def main():
     now = datetime.now(ChinaTimezone())
     is_release = args.release
 
+    # 至少维护最近 5 年的数据（今年及之前 4 年），并额外更新下一年。
+    fr_year = now.year - 4
     filenames = []
-    progress = tqdm(range(2007 if args.all else now.year, now.year + 2))
+    progress = tqdm(range(2007 if args.all else fr_year, now.year + 2))
     for i in progress:
         progress.set_description(f"Updating {i} data")
         filenames += list(update_data(i))
     progress.set_description("Updating holiday-cn.ics")
-    filenames.append(update_main_ics(now.year - 4, now.year + 1))
+    filenames.append(update_main_ics(fr_year, now.year + 1))
     print("")
 
     subprocess.run(["git", "add", *filenames], check=True)
@@ -163,10 +167,11 @@ def pack_data(file):
     """Pack data json in zip file."""
 
     zip_file = ZipFile(file, "w")
-    for i in os.listdir(workspace_path()):
+    json_dir = workspace_path("json")
+    for i in os.listdir(json_dir):
         if not re.match(r"\d+\.json", i):
             continue
-        zip_file.write(workspace_path(i), i)
+        zip_file.write(os.path.join(json_dir, i), i)
 
 
 if __name__ == "__main__":

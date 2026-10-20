@@ -7,6 +7,7 @@ import pytest
 from fetch import (
     CustomJSONEncoder,
     DescriptionParser,
+    annotate_day_name,
     get_paper,
     get_paper_urls,
     get_rules,
@@ -20,6 +21,14 @@ def test_get_paper_urls():
         "https://www.gov.cn/zhengce/zhengceku/2018-12/06/content_5346276.htm",
         "https://www.gov.cn/zhengce/zhengceku/2019-03/22/content_5375877.htm",
     ]
+
+
+def test_get_paper_urls_2014_excludes_non_holiday_paper():
+    urls = get_paper_urls(2014)
+    assert (
+        "https://www.gov.cn/zhengce/zhengceku/2014-09/29/content_9102.htm" not in urls
+    )
+    assert "https://www.gov.cn/zhengce/zhengceku/2014-01/02/content_1194.htm" in urls
 
 
 def test_get_rules():
@@ -57,6 +66,17 @@ def test_get_rules_2023():
             "9月29日至10月6日放假调休，共8天。10月7日（星期六）、10月8日（星期日）上班。",
         ),
     ]
+
+
+def test_annotate_day_name():
+    holiday = {"name": "元旦", "date": "2026-01-01", "isOffDay": True}
+    workday = {"name": "元旦", "date": "2026-01-04", "isOffDay": False}
+    assert annotate_day_name(holiday) == holiday
+    assert annotate_day_name(workday) == {
+        "name": "补班日（元旦）",
+        "date": "2026-01-04",
+        "isOffDay": False,
+    }
 
 
 def _normalize(iterable):

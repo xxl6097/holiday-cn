@@ -11,16 +11,22 @@ from typing import Iterator, List, Optional, Tuple
 import bs4
 import requests
 
+
+def _normalize_url(url: str) -> str:
+    """Normalize paper url scheme to https."""
+    return re.sub(r"^http://", "https://", url)
+
+
 PAPER_EXCLUDE = [
-    "http://www.gov.cn/zhengce/zhengceku/2014-09/29/content_9102.htm",
-    "http://www.gov.cn/zhengce/zhengceku/2015-02/09/content_9466.htm",
+    "https://www.gov.cn/zhengce/zhengceku/2014-09/29/content_9102.htm",
+    "https://www.gov.cn/zhengce/zhengceku/2015-02/09/content_9466.htm",
 ]
 PAPER_INCLUDE = {
-    2015: ["http://www.gov.cn/zhengce/zhengceku/2015-05/13/content_9742.htm"]
+    2015: ["https://www.gov.cn/zhengce/zhengceku/2015-05/13/content_9742.htm"]
 }
 
 PRE_PARSED_PAPERS = {
-    "http://www.gov.cn/zhengce/zhengceku/2015-05/13/content_9742.htm": [
+    "https://www.gov.cn/zhengce/zhengceku/2015-05/13/content_9742.htm": [
         {
             "name": "抗日战争暨世界反法西斯战争胜利70周年纪念日",
             "date": date(2015, 9, 3),
@@ -105,7 +111,7 @@ def _get_paper_urls(year: int) -> Iterator[str]:
         )
         for i in data["searchVO"]["listVO"]:
             if str(year) in i["title"]:
-                yield i["url"]
+                yield _normalize_url(i["url"])
         page_index += 1
         has_next_page = page_index < data["searchVO"]["totalpage"]
 
@@ -396,6 +402,7 @@ def parse_paper(year: int, url: str) -> Iterator[dict]:
     Returns:
         Iterator[dict]: Days
     """
+    url = _normalize_url(url)
     if url in PRE_PARSED_PAPERS:
         yield from PRE_PARSED_PAPERS[url]
         return
@@ -413,6 +420,17 @@ def parse_paper(year: int, url: str) -> Iterator[dict]:
         raise RuntimeError("Can not parse paper", url) from ex
 
 
+def annotate_day_name(day: dict) -> dict:
+    """Mark make-up workdays in the name field.
+
+    Off days keep the holiday name, workdays are named ``补班日（原节日名）``.
+    """
+
+    if day["isOffDay"]:
+        return day
+    return {**day, "name": f"补班日（{day['name']}）"}
+
+
 def fetch_holiday(year: int):
     """Fetch holiday data."""
 
@@ -423,10 +441,14 @@ def fetch_holiday(year: int):
     for k in (j for i in papers for j in parse_paper(year, i)):
         days[k["date"]] = k
 
+    days = [
+        annotate_day_name(i) for i in sorted(days.values(), key=lambda x: x["date"])
+    ]
+
     return {
         "year": year,
         "papers": papers,
-        "days": sorted(days.values(), key=lambda x: x["date"]),
+        "days": days,
     }
 
 
