@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -27,11 +27,11 @@ jobs:
         run: coverage run -m pytest
       - name: Lint
         run: make lint
-      - name: Update(master)
-        if: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+      - name: Update(main)
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: coverage run -a ./scripts/update.py --release
       - name: Update
-        if: ${{ !(github.ref == 'refs/heads/master' && github.event_name != 'pull_request') }}
+        if: ${{ !(github.ref == 'refs/heads/main' && github.event_name != 'pull_request') }}
         run: coverage run -a ./scripts/update.py
